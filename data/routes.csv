@@ -1,0 +1,6 @@
+route_id,name,origin,destination,base_time_min,distance_km
+R1_QASIM,Qasimabad Express,STC,Qasimabad,35.0,16.5
+R2_LATIF,Latifabad Route,STC,Latifabad,45.0,22.0
+R3_HYD_CITY,Hyderabad City Station,Main Gate,Hyder Chowk / City,40.0,19.0
+R4_KOTRI,Kotri Shuttle,Main Gate,Kotri / Jamshoro Phatak,25.0,11.0
+R5_CAMPUS_CIRC,Internal Campus Circular,STC,Main Gate Loop,15.0,6.0

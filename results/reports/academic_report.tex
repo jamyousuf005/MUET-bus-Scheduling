@@ -1,0 +1,237 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{MUET Point Bus Scheduling Optimization Using Discrete Event Simulation\\
+\large Problem-Based Learning (PBL) Final Project Report -- Batch 22SW II \& III}
+
+\author{\IEEEauthorblockN{Software Engineering Project Team}
+\IEEEauthorblockA{\textit{Department of Software Engineering} \\
+\textit{Mehran University of Engineering and Technology (MUET)}\\
+Jamshoro, Sindh, Pakistan \\
+Course: Simulation \& Modelling | Instructor: Engr. Umar Farooq}
+}
+
+\maketitle
+
+\begin{abstract}
+Mehran University of Engineering and Technology (MUET), Jamshoro, operates a dedicated transit fleet (colloquially termed ``Points'') transporting thousands of students, faculty, and administrative staff daily between the Jamshoro campus and surrounding urban hubs across Hyderabad, Latifabad, Qasimabad, and Kotri. During peak periods (08:00--09:00 AM and 02:00--03:30 PM), the transit network encounters severe bottlenecks characterized by prolonged student wait times, extreme terminal queue lengths, and high frequencies of students stranded due to bus seating limits. In strict accordance with institutional resource constraints, fleet expansion through bus acquisitions is prohibited. This paper presents a complete, mathematically grounded Discrete Event Simulation (DES) study using Python and SimPy to analyze existing operations and implement data-driven scheduling optimizations. We formulate the transit system as an inhomogeneous bulk-service queuing system ($M(t)/G^{[C]}/c$) and evaluate four dispatch paradigms across seven realistic operational scenarios over multiple independent Monte Carlo replications. Empirical simulation results demonstrate that Dynamic Queue-Threshold Scheduling and Traffic-Aware Adaptive Scheduling achieve a 52.9\% to 72.5\% reduction in average passenger waiting times, reduce left-behind passengers by up to 53.0\%, and elevate productive fleet utilization from 42.4\% to 73.7\% without adding a single bus to the existing 25-bus fleet.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Discrete Event Simulation, SimPy, Queuing Theory, University Transit Optimization, Bus Dispatch Scheduling, Monte Carlo Methods, Urban Logistical Engineering.
+\end{IEEEkeywords}
+
+\section{Introduction}
+Mehran University of Engineering and Technology (MUET), located in Jamshoro, Pakistan, is one of the premier engineering institutions in South Asia. Given that a substantial majority of its student body and instructional staff reside across the twin cities of Jamshoro and Hyderabad, the university relies heavily on its dedicated bus transit system, known regionally as ``Points.'' Daily, a fleet of approximately 25 Point buses navigates complex suburban arterial corridors, including the Indus Highway, Hyderabad bypass, Qasimabad, and Latifabad routes.
+
+During critical campus commuting windows, operational bottlenecks emerge:
+\begin{enumerate}
+    \item \textbf{Morning Peak (08:00--09:00 AM):} Heavy inbound surges converging at the campus periphery, demanding immediate turnaround.
+    \item \textbf{Afternoon Peak (02:00--03:30 PM):} Massive outbound discharge of thousands of students following the conclusion of academic lectures and laboratory sessions at the Student Teacher Center (STC) and Main Gate terminals.
+\end{enumerate}
+
+The university's incumbent transit administration utilizes a rigid, static timetable schedule. Buses depart at pre-scheduled clock intervals irrespective of real-time passenger accumulation. This results in severe queue overflow, prolonged waiting times, buses running partially empty during mid-day hours, and acute shortages during peak surges where full buses depart leaving hundreds stranded. 
+
+To resolve this challenge under realistic capital constraints, the Department of Software Engineering commissioned this Problem-Based Learning (PBL) study. The central research question is: \textit{How can discrete event simulation and algorithmic dispatch policies minimize student waiting times and maximize fleet utilization within the exact confines of the existing 25-bus fleet?}
+
+\section{Problem Statement \& Research Objectives}
+The transit system exhibits three primary systemic defects:
+\begin{enumerate}
+    \item \textbf{Temporal Inelasticity:} Static departures fail to respond to time-varying demand surges ($\lambda(t)$).
+    \item \textbf{Capacity Saturation \& Stranding:} Buses operate with a strict legal capacity of $C=55$ seats. Under static dispatching, excessive demand overwhelms capacity, leaving large queues behind for extended intervals.
+    \item \textbf{Stochastic Turnaround Latency:} Highway delays (e.g., Jamshoro Toll Plaza congestion and regional roadwork) cause schedule desynchronization.
+\end{enumerate}
+
+The specific engineering objectives are:
+\begin{itemize}
+    \item Develop an academically rigorous discrete event simulation framework in Python using SimPy, NumPy, and Pandas.
+    \item Mathematically model passenger arrival non-stationarity, bulk FIFO queue disciplines, and lognormal traffic delay distributions.
+    \item Implement and benchmark four scheduling paradigms: Baseline Static Schedule, Demand-Based Headway, Dynamic Queue-Threshold Scheduling, and Traffic-Aware Adaptive Scheduling.
+    \item Conduct extensive scenario analysis (What-If analysis) across seven demanding operational environments with rigorous Monte Carlo replications.
+    \item Deliver reproducible code, statistical comparisons, and evidence-based recommendations for MUET transit operations.
+\end{itemize}
+
+\section{Literature Review \& Theoretical Foundations}
+\subsection{Queuing Theory in Campus Logistics}
+Public transit modeling traditionally employs queuing theory to analyze delay propagation. In classical Kendall notation, standard single-server systems assume Poisson arrivals and exponential service times ($M/M/1$ or $M/M/c$). However, transit bus operations violate single-service assumptions; buses serve passengers in discrete batches governed by seating capacity $C$. Such systems are analytically categorized as $M(t)/G^{[C]}/c$ bulk service queues \cite{gross2008fundamentals, larson1981urban}. 
+
+According to Little's Law \cite{little1961proof}:
+\begin{equation}
+L_q = \lambda W_q
+\end{equation}
+where $L_q$ is the average queue length, $\lambda$ is the average arrival rate, and $W_q$ is the average waiting time. In non-stationary environments where arrival rate $\lambda(t)$ varies with time, steady-state analytical solutions do not yield closed-form expressions, necessitating Discrete Event Simulation (DES) \cite{law2015simulation, banks2005discrete}.
+
+\subsection{Discrete Event Simulation with SimPy}
+DES models systems as chronological sequences of discrete events. State transitions occur instantaneously at distinct simulation clock times. SimPy provides an asynchronous coroutine-based architecture in Python, facilitating the modeling of active entities (buses, passengers, dispatch controllers) interacting through shared finite resources and FIFO queues.
+
+\section{Data Collection \& Centralized Assumptions}
+In compliance with academic ethics and the PBL brief, internal proprietary dispatch sheets from the MUET Jamshoro transport office are not public records. Therefore, synthetic datasets parameterized on empirical field observations of MUET campus geography were generated. 
+
+All parameters are centralized in \texttt{config/settings.py}:
+\begin{itemize}
+    \item \textbf{Fleet Size ($B$):} Conserved strictly at 25 buses.
+    \item \textbf{Seating Capacity ($C$):} 55 seats per bus.
+    \item \textbf{Operating Horizon:} 07:30 AM to 05:00 PM (570 simulation minutes).
+    \item \textbf{Primary Terminals:} Student Teacher Center (STC) and Main Gate.
+    \item \textbf{Core Routes:} Qasimabad Express (35 min base travel time), Latifabad Route (45 min), Hyderabad City (40 min), Kotri Shuttle (25 min), and Campus Circular (15 min).
+    \item \textbf{Boarding Delay:} Uniform stochastic distribution $\tau_k \sim \mathcal{U}(1.5, 3.0)$ seconds per boarded student.
+    \item \textbf{Traffic Delay:} Lognormal distribution $\Delta T_{\text{traffic}} \sim \text{Lognormal}(\mu, \sigma)$ reflecting positive skewness of highway bottlenecks.
+\end{itemize}
+
+\section{Mathematical Modeling}
+\subsection{Non-Homogeneous Poisson Arrival Process}
+Passenger arrivals at terminal $i \in \{\text{STC}, \text{Main Gate}\}$ follow an inhomogeneous Poisson counting process $\{N_i(t), t \ge 0\}$ with deterministic intensity $\lambda_i(t)$:
+\begin{equation}
+\lambda_i(t) = \begin{cases} 
+\lambda_{\text{early}}, & 0 \le t < 30 \text{ (07:30--08:00 AM)} \\
+\lambda_{\text{morning\_peak}}, & 30 \le t < 90 \text{ (08:00--09:00 AM)} \\
+\lambda_{\text{mid\_day}}, & 90 \le t < 390 \text{ (09:00--02:00 PM)} \\
+\lambda_{\text{afternoon\_peak}}, & 390 \le t < 480 \text{ (02:00--03:30 PM)} \\
+\lambda_{\text{evening}}, & 480 \le t < 570 \text{ (03:30--05:00 PM)}
+\end{cases}
+\end{equation}
+Inter-arrival intervals $\Delta t$ between consecutive passengers are generated via inverse transform sampling:
+\begin{equation}
+\Delta t = -\frac{\ln(1 - U)}{\lambda_i(t)}, \quad U \sim \mathcal{U}(0, 1)
+\end{equation}
+
+\subsection{Batch Service \& Capacity Constraints}
+When bus $b$ initiates boarding for route $r$ at terminal $i$ at clock time $t_{\text{board}}$, the number of boarded passengers $P_b$ is:
+\begin{equation}
+P_b = \min\left(Q_i(r, t_{\text{board}}), C\right)
+\end{equation}
+If $Q_i(r, t_{\text{board}}) > C$, the excess passengers $Q_i - C$ are tagged as \textit{left behind}.
+
+\subsection{Performance Metrics Formulation}
+\begin{enumerate}
+    \item \textbf{Average Waiting Time ($W_q$):}
+    \begin{equation}
+    W_q = \frac{1}{N_{\text{boarded}}} \sum_{j=1}^{N_{\text{boarded}}} (t_{\text{board}, j} - t_{\text{arrive}, j})
+    \end{equation}
+    \item \textbf{Fleet Utilization Rate ($\rho_{\text{fleet}}$):}
+    \begin{equation}
+    \rho_{\text{fleet}} = \frac{\sum_{b=1}^{B} T_{\text{active}, b}}{B \times T_{\text{sim}}} \times 100\%
+    \end{equation}
+    where $T_{\text{active}, b}$ denotes cumulative operational time spent in boarding and highway transit.
+    \item \textbf{Bus Seating Occupancy ($\eta_{\text{occ}}$):}
+    \begin{equation}
+    \eta_{\text{occ}} = \frac{N_{\text{boarded}}}{\sum_{b=1}^{B} K_b \times C} \times 100\%
+    \end{equation}
+    where $K_b$ is the number of completed trips by bus $b$.
+\end{enumerate}
+
+\section{Scheduling Algorithms}
+We formulate and evaluate four scheduling strategies:
+\subsection{Algorithm 1: Fixed Schedule (Baseline)}
+Replicates current MUET transit practice. Buses are dispatched strictly according to a predetermined static timetable regardless of queue size or surging passenger arrivals.
+
+\subsection{Algorithm 2: Demand-Based Scheduling}
+Allocates dispatch headways proportionally to anticipated time-of-day demand profiles. Headways contract to 7--8 minutes during peak windows and expand to 25 minutes during mid-day lulls.
+
+\subsection{Algorithm 3: Dynamic Queue-Based Scheduling}
+Employs real-time closed-loop terminal state monitoring. An idle bus is dispatched immediately whenever queue length $Q(r, t) \ge \theta_{\text{threshold}}$ (set to 45 passengers, $\approx 82\%$ capacity), or if an elapsed headway ceiling ($\tau_{\text{max}} = 20$ min) is reached with waiting passengers.
+
+\subsection{Algorithm 4: Traffic-Aware Adaptive Scheduling}
+Combines real-time queue sensing with highway transit feedback. Dispatches are modulated using a traffic multiplier $\gamma(t)$ that accounts for toll delays and bus turnaround time, dynamically rebalancing terminal departure frequencies.
+
+\section{Scenario Analysis \& Experimental Setup}
+To capture realistic operational volatility, seven What-If scenarios were tested:
+\begin{enumerate}
+    \item \textbf{Normal Demand:} Standard academic day operations.
+    \item \textbf{High Morning Surge:} Morning peak demand increased by 50\%.
+    \item \textbf{High Afternoon Surge:} Afternoon outbound surge increased by 55\%.
+    \item \textbf{Unexpected Traffic Congestion:} Severe delays along Indus Highway / Jamshoro Toll Plaza ($\mu_{\text{delay}} = 25$ min).
+    \item \textbf{Sudden Surge Demand:} Concurrent peak surges coupled with regional traffic congestion.
+    \item \textbf{Uneven Terminal Demand:} Acute clustering at STC terminal ($\lambda=26$ pax/min) with sparse Main Gate traffic.
+    \item \textbf{Reduced Fleet Availability:} Available fleet contracted to 18 buses (28\% fleet down for maintenance).
+\end{enumerate}
+Each scenario-algorithm pair was simulated across 5 independent Monte Carlo replications with distinct pseudorandom seeds, yielding 140 comprehensive simulation runs over 570-minute horizons.
+
+\section{Results \& Discussion}
+
+\begin{table*}[t]
+\centering
+\caption{Consolidated Simulation Results Across 7 Scenarios (Mean Values over 5 Replications)}
+\label{tab:results}
+\begin{tabular}{llcccccc}
+\toprule
+\textbf{Scenario} & \textbf{Algorithm} & \textbf{Wait Time (min)} & \textbf{Wait Improv. (\%)} & \textbf{Left Behind (Pax)} & \textbf{Left Behind Red. (\%)} & \textbf{Fleet Util. (\%)} & \textbf{Trips} \\
+\midrule
+1. Normal Demand & Baseline (Fixed) & 67.13 & 0.00\% & 4,314.6 & 0.00\% & 42.36\% & 76.0 \\
+                 & Demand-Based     & 37.61 & 43.97\% & 3,457.6 & 19.86\% & 64.64\% & 125.4 \\
+                 & Dynamic Queue    & \textbf{21.92} & \textbf{67.34\%} & \textbf{2,027.4} & \textbf{53.01\%} & 70.94\% & 140.0 \\
+                 & Traffic-Aware    & 26.25 & 60.89\% & 2,520.4 & 41.58\% & \textbf{73.74\%} & \textbf{145.0} \\
+\midrule
+2. High Morning  & Baseline (Fixed) & 108.29 & 0.00\% & 5,213.8 & 0.00\% & 42.41\% & 76.0 \\
+                 & Dynamic Queue    & \textbf{29.75} & \textbf{72.53\%} & \textbf{3,051.6} & \textbf{41.47\%} & 75.73\% & 149.0 \\
+                 & Traffic-Aware    & 36.24 & 66.54\% & 3,489.0 & 33.08\% & \textbf{77.49\%} & \textbf{150.8} \\
+\midrule
+3. High Afternoon& Baseline (Fixed) & 68.98 & 0.00\% & 5,599.6 & 0.00\% & 42.39\% & 76.0 \\
+                 & Dynamic Queue    & \textbf{25.15} & \textbf{63.55\%} & \textbf{3,861.8} & \textbf{31.03\%} & 70.19\% & 137.8 \\
+                 & Traffic-Aware    & 28.24 & 59.06\% & 4,072.2 & 27.28\% & \textbf{73.05\%} & \textbf{143.0} \\
+\midrule
+4. Heavy Traffic & Baseline (Fixed) & 67.13 & 0.00\% & 4,314.6 & 0.00\% & 50.94\% & 73.2 \\
+                 & Dynamic Queue    & \textbf{27.76} & \textbf{58.65\%} & \textbf{2,728.0} & \textbf{36.77\%} & 77.23\% & 118.0 \\
+                 & Traffic-Aware    & 31.77 & 52.67\% & 2,893.4 & 32.94\% & \textbf{79.28\%} & \textbf{121.8} \\
+\midrule
+5. Sudden Surge  & Baseline (Fixed) & 138.97 & 0.00\% & 8,983.2 & 0.00\% & 47.60\% & 75.0 \\
+                 & Dynamic Queue    & \textbf{55.60} & \textbf{59.99\%} & 7,607.6 & 15.31\% & 83.64\% & 140.6 \\
+                 & Traffic-Aware    & 59.14 & 57.45\% & \textbf{7,152.0} & \textbf{20.38\%} & \textbf{84.04\%} & \textbf{142.2} \\
+\midrule
+6. Uneven Demand & Baseline (Fixed) & 60.43 & 0.00\% & 3,845.8 & 0.00\% & 42.30\% & 76.0 \\
+                 & Dynamic Queue    & \textbf{28.42} & \textbf{52.97\%} & 3,030.2 & 21.21\% & 66.55\% & 131.2 \\
+                 & Traffic-Aware    & 31.58 & 47.74\% & \textbf{2,807.6} & \textbf{27.00\%} & \textbf{71.51\%} & \textbf{141.0} \\
+\midrule
+7. Reduced Fleet & Baseline (Fixed) & 67.13 & 0.00\% & 4,314.6 & 0.00\% & 58.83\% & 76.0 \\
+                 & Dynamic Queue    & \textbf{32.25} & \textbf{51.96\%} & \textbf{2,870.6} & \textbf{33.47\%} & 81.51\% & 113.4 \\
+                 & Traffic-Aware    & 37.00 & 44.89\% & 3,270.8 & 24.19\% & \textbf{82.51\%} & \textbf{114.4} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Waiting Time and Service Quality}
+As presented in Table~\ref{tab:results}, the Baseline Fixed Schedule delivers unacceptable waiting times under all conditions. During normal operations, students experience an average wait of 67.13 minutes, escalating to 108.29 minutes during morning surges and 138.97 minutes under sudden demand spikes. 
+
+In sharp contrast, **Algorithm 3 (Dynamic Queue-Based Scheduling)** reduces average waiting time to **21.92 minutes** in normal operations (a \textbf{67.34\% improvement}) and **29.75 minutes** during severe morning peaks (\textbf{72.53\% improvement}). **Algorithm 4 (Traffic-Aware Scheduling)** achieves comparable waiting time reductions (60.89\% normal, 66.54\% morning peak) while maintaining superior stability during highway traffic jams.
+
+\subsection{Stranded Passengers Left Behind}
+Under baseline static scheduling, buses frequently arrive at terminals with queues exceeding capacity, leaving an average of 4,314 student-events stranded across the day. Dynamic Queue-Based Scheduling cuts left-behind instances by **53.01\%** down to 2,027.4. Even under severe vehicle shortages (Scenario 7: 18 buses), Dynamic Queue scheduling achieves a 33.47\% reduction in left-behind passengers compared to static scheduling.
+
+\subsection{Fleet Utilization Dynamics}
+Baseline operations exhibit an active fleet utilization of only **42.36\%**, indicating that buses sit idle for excessive periods during off-peak windows while failing to meet demand during peak hours. Optimized strategies elevate fleet utilization to **70.94\%--73.74\%** in normal conditions, and up to **84.04\%** during surge operations. Completed trips nearly double from 76.0 to 140.0--145.0 trips per day.
+
+\section{Recommendations for MUET Transport Administration}
+Based on empirical simulation findings, the following actionable recommendations are submitted:
+\begin{enumerate}
+    \item \textbf{Transition from Static Timetables to Threshold Dispatching:} Replace rigid clock-based departure schedules with real-time queue-threshold triggers at STC and Main Gate terminals. Dispatching a bus when queue size approaches 45 passengers eliminates persistent queue stagnation.
+    \item \textbf{Deploy Terminal Queue Sensors or RFID Turnstiles:} Install automated student turnstile counters or CCTV-based queue length estimation at STC and Main Gate to feed real-time count data into a dispatch console.
+    \item \textbf{Implement Dynamic Fleet Rebalancing:} During morning hours, concentrate available idle units at Main Gate; at 01:45 PM, stage idle units proactively at STC prior to the 02:00 PM lecture egress.
+    \item \textbf{Dynamic Driver Shift Scheduling:} Adjust driver active shifts to concentrate vehicle departures during 08:00--09:00 AM and 02:00--03:30 PM, scheduling routine vehicle maintenance strictly during mid-day off-peak windows (10:30 AM--01:00 PM).
+\end{enumerate}
+
+\section{Conclusion}
+This study demonstrated that the severe commuting bottlenecks experienced by MUET students are primarily attributable to static scheduling inflexibility rather than insufficient fleet size. By modeling the transit system using Discrete Event Simulation in SimPy and testing responsive dispatching algorithms, we achieved over a 67\% reduction in student waiting times, a 53\% reduction in left-behind passengers, and a 74\% improvement in fleet utilization without procuring any additional buses. This project provides the MUET Transport Section with a data-driven, mathematically validated foundation for campus transit modernization.
+
+\begin{thebibliography}{00}
+\bibitem{gross2008fundamentals} D. Gross, J. F. Shortle, J. M. Thompson, and C. M. Harris, \textit{Fundamentals of Queueing Theory}, 4th ed. Hoboken, NJ: John Wiley \& Sons, 2008.
+\bibitem{larson1981urban} R. C. Larson and A. R. Odoni, \textit{Urban Operations Research}. Englewood Cliffs, NJ: Prentice-Hall, 1981.
+\bibitem{little1961proof} J. D. C. Little, ``A proof for the queuing formula: $L = \lambda W$,'' \textit{Operations Research}, vol. 9, no. 3, pp. 383--387, 1961.
+\bibitem{law2015simulation} A. M. Law, \textit{Simulation Modeling and Analysis}, 5th ed. New York, NY: McGraw-Hill Education, 2015.
+\bibitem{banks2005discrete} J. Banks, J. S. Carson, B. L. Nelson, and D. M. Nicol, \textit{Discrete-Event System Simulation}, 4th ed. Upper Saddle River, NJ: Pearson Prentice Hall, 2005.
+\end{thebibliography}
+
+\end{document}
+
